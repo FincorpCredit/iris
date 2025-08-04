@@ -1,0 +1,392 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model auditlog {
+  id         String   @id @default(uuid())
+  userId     String
+  action     String
+  resource   String
+  resourceId String
+  metadata   String?  @db.Text
+  createdAt  DateTime @default(now())
+  user       user     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+model customer {
+  id                    String                 @id @default(uuid())
+  name                  String?
+  email                 String                 @unique
+  phone                 String?
+  avatar                String?
+  timezone              String?                @default("UTC")
+  language              String?                @default("en")
+  lastSeenAt            DateTime?
+  isOnline              Boolean                @default(false)
+  metadata              Json?                  // Custom fields, preferences, etc.
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  chats                 chat[]
+  conversationSessions  conversation_session[]
+  customerProfile       customer_profile?
+  typingIndicators      typing_indicator[] @relation("CustomerTyping")
+
+  @@index([email])
+  @@index([isOnline])
+  @@index([lastSeenAt])
+}
+
+model chat {
+  id                    String                 @id @default(uuid())
+  customerId            String
+  status                ChatStatus             @default(OPEN)
+  priority              Priority               @default(MEDIUM)
+  assignedAgentId       String?
+  satisfied             Boolean                @default(false)
+  deleted               Boolean                @default(false)
+  source                ChatSource             @default(WIDGET)
+  tags                  String[]               @default([])
+  lastMessageAt         DateTime?
+  firstResponseTime     Int?                   // Time to first response in seconds
+  avgResponseTime       Int?                   // Average response time in seconds
+  messageCount          Int                    @default(0)
+  unreadCount           Int                    @default(0)
+  lastUnreadMessageId   String?
+  conversationSessionId String?
+  metadata              Json?                  // Additional chat metadata
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  customer              customer               @relation(fields: [customerId], references: [id])
+  assignedAgent         user?                  @relation("AgentChats", fields: [assignedAgentId], references: [id])
+  conversationSession   conversation_session?  @relation(fields: [conversationSessionId], references: [id])
+  message               message[]
+  chatNotifications     chat_notification[]
+  typingIndicators      typing_indicator[]
+
+  @@index([assignedAgentId])
+  @@index([status])
+  @@index([priority])
+  @@index([customerId])
+  @@index([source])
+  @@index([lastMessageAt])
+  @@index([conversationSessionId])
+}
+
+model companyknowledge {
+  id           String         @id @default(uuid())
+  title        String         @unique
+  content      String         @db.Text
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  knowledgetag knowledgetag[]
+}
+
+model knowledgetag {
+  id               String           @id @default(uuid())
+  name             String
+  knowledgeId      String
+  companyknowledge companyknowledge @relation(fields: [knowledgeId], references: [id])
+
+  @@index([knowledgeId])
+}
+
+// New models for enhanced chat widget functionality
+
+model conversation_session {
+  id                String    @id @default(uuid())
+  customerId        String
+  sessionToken      String    @unique
+  isActive          Boolean   @default(true)
+  startedAt         DateTime  @default(now())
+  endedAt           DateTime?
+  lastActivityAt    DateTime  @default(now())
+  messageCount      Int       @default(0)
+  aiMessageCount    Int       @default(0)
+  humanMessageCount Int       @default(0)
+  averageResponseTime Int?    // in seconds
+  customerSatisfaction Int?   // 1-5 rating
+  tags              String[]  @default([])
+  metadata          Json?     // Session-specific data
+  ipAddress         String?
+  userAgent         String?
+  referrer          String?
+  customer          customer  @relation(fields: [customerId], references: [id])
+  chats             chat[]
+  messages          message[]
+
+  @@index([customerId])
+  @@index([sessionToken])
+  @@index([isActive])
+  @@index([startedAt])
+  @@index([lastActivityAt])
+}
+
+model customer_profile {
+  id                    String   @id @default(uuid())
+  customerId            String   @unique
+  company               String?
+  jobTitle              String?
+  industry              String?
+  website               String?
+  location              String?
+  notes                 String?  @db.Text
+  leadScore             Int?     @default(0)
+  totalChats            Int      @default(0)
+  totalMessages         Int      @default(0)
+  averageResponseTime   Int?     // in seconds
+  lastContactedAt       DateTime?
+  preferredContactTime  String?  // e.g., "9-17" for 9 AM to 5 PM
+  communicationPrefs    Json?    // Email, SMS, chat preferences
+  customFields          Json?    // Flexible custom data
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  customer              customer @relation(fields: [customerId], references: [id])
+
+  @@index([customerId])
+  @@index([company])
+  @@index([industry])
+  @@index([leadScore])
+  @@index([lastContactedAt])
+}
+
+model chat_notification {
+  id          String             @id @default(uuid())
+  chatId      String
+  userId      String             // Agent who should receive notification
+  type        NotificationType
+  title       String
+  message     String
+  isRead      Boolean            @default(false)
+  readAt      DateTime?
+  actionUrl   String?            // URL to navigate when clicked
+  metadata    Json?              // Additional notification data
+  createdAt   DateTime           @default(now())
+  chat        chat               @relation(fields: [chatId], references: [id])
+  user        user               @relation("UserNotifications", fields: [userId], references: [id])
+
+  @@index([chatId])
+  @@index([userId])
+  @@index([type])
+  @@index([isRead])
+  @@index([createdAt])
+}
+
+model typing_indicator {
+  id                    String   @id @default(uuid())
+  chatId                String?
+  conversationSessionId String?
+  userId                String?  // For agents
+  customerId            String?  // For customers
+  isTyping              Boolean  @default(true)
+  lastTypingAt          DateTime @default(now())
+  expiresAt             DateTime // Auto-expire typing indicators
+  chat                  chat?    @relation(fields: [chatId], references: [id])
+  user                  user?    @relation("UserTyping", fields: [userId], references: [id])
+  customer              customer? @relation("CustomerTyping", fields: [customerId], references: [id])
+
+  @@index([chatId])
+  @@index([conversationSessionId])
+  @@index([userId])
+  @@index([customerId])
+  @@index([isTyping])
+  @@index([expiresAt])
+}
+
+model widget_settings {
+  id                    String   @id @default(uuid())
+  name                  String   @unique @default("default")
+  isEnabled             Boolean  @default(true)
+  welcomeMessage        String   @default("Hi! How can I help you today?")
+  offlineMessage        String   @default("We're currently offline. Leave us a message and we'll get back to you!")
+  theme                 Json     @default("{\"primaryColor\": \"#3b82f6\", \"textColor\": \"#1f2937\", \"backgroundColor\": \"#ffffff\"}")
+  position              String   @default("bottom-right") // bottom-right, bottom-left, etc.
+  showAgentPhotos       Boolean  @default(true)
+  showTypingIndicator   Boolean  @default(true)
+  enableFileUpload      Boolean  @default(true)
+  enableEmojis          Boolean  @default(true)
+  maxFileSize           Int      @default(10485760) // 10MB in bytes
+  allowedFileTypes      String[] @default(["image/*", "application/pdf", ".doc", ".docx"])
+  businessHours         Json?    // Operating hours configuration
+  autoAssignment        Boolean  @default(true)
+  requireEmail          Boolean  @default(true)
+  requireName           Boolean  @default(true)
+  collectPhone          Boolean  @default(false)
+  customFields          Json?    // Additional form fields
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([name])
+  @@index([isEnabled])
+}
+
+model message {
+  id                    String            @id @default(uuid())
+  chatId                String
+  conversationSessionId String?
+  senderId              String?
+  senderType            SenderType        @default(CUSTOMER)
+  content               String            @db.Text
+  messageType           MessageType       @default(TEXT)
+  isFromAI              Boolean           @default(false)
+  aiModel               String?           // Which AI model was used
+  aiPromptTokens        Int?              // Token usage tracking
+  aiCompletionTokens    Int?
+  attachments           Json?             // File attachments metadata
+  metadata              Json?             // Additional message metadata
+  isRead                Boolean           @default(false)
+  readAt                DateTime?
+  deliveredAt           DateTime?
+  failedAt              DateTime?
+  retryCount            Int               @default(0)
+  parentMessageId       String?           // For threaded conversations
+  editedAt              DateTime?
+  deletedAt             DateTime?
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+  chat                  chat              @relation(fields: [chatId], references: [id])
+  conversationSession   conversation_session? @relation(fields: [conversationSessionId], references: [id])
+  user                  user?             @relation(fields: [senderId], references: [id])
+  parentMessage         message?          @relation("MessageThread", fields: [parentMessageId], references: [id])
+  replies               message[]         @relation("MessageThread")
+
+  @@index([chatId])
+  @@index([conversationSessionId])
+  @@index([senderId])
+  @@index([senderType])
+  @@index([messageType])
+  @@index([isFromAI])
+  @@index([isRead])
+  @@index([createdAt])
+  @@index([parentMessageId])
+}
+
+model permission {
+  id       String @id @default(uuid())
+  roleId   String
+  resource String
+  action   String
+  role     role   @relation(fields: [roleId], references: [id])
+
+  @@unique([roleId, resource, action])
+}
+
+model role {
+  id          String       @id @default(uuid())
+  name        String       @unique
+  description String?
+  permissions Json // Store permission flags
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  permission  permission[]
+  user        user[]
+}
+
+model user {
+  id                 String         @id @default(uuid())
+  email              String         @unique
+  name               String
+  passwordHash       String
+  roleId             String
+  status             UserStatus     @default(OFFLINE)
+  lastActiveAt       DateTime?
+  profileImage       String?
+  department         String?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+  deleted            Boolean        @default(false)
+  mustChangePassword Boolean        @default(false)
+  passwordChangedAt  DateTime?
+  authPreference     AuthPreference @default(PASSWORD)
+  tempCode           String?        // For 6-digit temporary codes
+  tempCodeExpiry     DateTime?      // Expiry time for temp codes
+  auditlog           auditlog[]
+  assignedChats      chat[]         @relation("AgentChats")
+  message            message[]
+  notifications      chat_notification[] @relation("UserNotifications")
+  typingIndicators   typing_indicator[] @relation("UserTyping")
+  role               role           @relation(fields: [roleId], references: [id])
+
+  @@index([roleId])
+  @@index([email])
+  @@index([status])
+}
+
+enum UserStatus {
+  ONLINE
+  OFFLINE
+  AWAY
+  BREAK
+}
+
+enum ChatStatus {
+  OPEN
+  IN_PROGRESS
+  WAITING
+  RESOLVED
+  CLOSED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum AuthPreference {
+  PASSWORD
+  CODE
+}
+
+// New enums for enhanced chat functionality
+enum SenderType {
+  CUSTOMER
+  AGENT
+  AI
+  SYSTEM
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  FILE
+  AUDIO
+  VIDEO
+  SYSTEM
+  TYPING
+}
+
+enum ChatSource {
+  WIDGET
+  EMAIL
+  PHONE
+  SOCIAL
+  API
+}
+
+enum NotificationType {
+  NEW_MESSAGE
+  CHAT_ASSIGNED
+  CHAT_TRANSFERRED
+  CUSTOMER_WAITING
+  CHAT_RESOLVED
+  MENTION
+  SYSTEM_ALERT
+}
+
+// Legacy enum for backward compatibility
+enum chat_status {
+  OPEN
+  ASSIGNED
+  ESCALATED
+  SATISFIED
+  CLOSED
+}

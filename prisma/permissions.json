@@ -1,0 +1,38 @@
+[
+    {
+      "role": "admin",
+      "permissions": [
+        { "resource": "chat", "action": "read" },
+        { "resource": "chat", "action": "assign" },
+        { "resource": "chat", "action": "delete" },
+        { "resource": "chat", "action": "escalate" },
+        { "resource": "user", "action": "invite" },
+        { "resource": "user", "action": "read" },
+        { "resource": "user", "action": "edit" },
+        { "resource": "dashboard", "action": "access" },
+        { "resource": "agent", "action": "create" },
+        { "resource": "agent", "action": "deactivate" },
+        { "resource": "agent", "action": "assign_chat" },
+        { "resource": "auditlog", "action": "read" }
+      ]
+    },
+    {
+      "role": "agent",
+      "permissions": [
+        { "resource": "chat", "action": "read_own" },
+        { "resource": "chat", "action": "write_own" },
+        { "resource": "chat", "action": "close_own" },
+        { "resource": "chat", "action": "escalate_own" },
+        { "resource": "dashboard", "action": "access" }
+      ]
+    },
+    {
+      "role": "customer",
+      "permissions": [
+        { "resource": "chat", "action": "create" },
+        { "resource": "chat", "action": "view_own" },
+        { "resource": "chat", "action": "rate" }
+      ]
+    }
+  ]
+  
