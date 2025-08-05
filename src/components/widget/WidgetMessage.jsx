@@ -44,6 +44,29 @@ export const WidgetMessage = ({
     });
   };
 
+  // Format message content with markdown-style formatting
+  const formatMessageContent = (content) => {
+    if (!content) return '';
+
+    // Split content by **text** pattern and create elements
+    const parts = content.split(/(\*\*[^*]+\*\*)/g);
+
+    return parts.map((part, index) => {
+      // Check if this part is bold text (wrapped in **)
+      if (part.startsWith('**') && part.endsWith('**')) {
+        // Remove the asterisks and make it bold
+        const boldText = part.slice(2, -2);
+        return (
+          <strong key={index} className="font-semibold">
+            {boldText}
+          </strong>
+        );
+      }
+      // Regular text
+      return part;
+    });
+  };
+
   // Get message status icon
   const getStatusIcon = () => {
     if (isCustomer) {
@@ -61,7 +84,7 @@ export const WidgetMessage = ({
     return (
       <div className={cn('flex justify-center my-2', className)}>
         <Badge variant="secondary" className="text-xs px-2 py-1">
-          {message.content}
+          {formatMessageContent(message.content)}
         </Badge>
       </div>
     );
@@ -134,7 +157,7 @@ export const WidgetMessage = ({
         >
           {/* Message Text */}
           <div className="text-sm leading-relaxed chat-message-content">
-            {message.content}
+            {formatMessageContent(message.content)}
           </div>
 
           {/* Message Type Indicators */}
