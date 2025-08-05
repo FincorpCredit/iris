@@ -65,7 +65,7 @@ export class ConversationService {
       let customer = await prisma.customer.findUnique({
         where: { email },
         include: {
-          customer_profile: true
+          customerProfile: true
         }
       });
 
