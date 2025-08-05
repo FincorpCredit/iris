@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useRealtimeTyping } from '@/hooks/useRealtimeTyping';
 
 /**
  * Custom hook for managing chat widget functionality
@@ -9,12 +10,21 @@ export const useWidgetChat = (apiUrl = '/api/widget', widgetName = 'default') =>
   const [messages, setMessages] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
-  const [typingIndicators, setTypingIndicators] = useState([]);
+  const [aiTypingIndicators, setAiTypingIndicators] = useState([]);
   const [settings, setSettings] = useState(null);
   const [error, setError] = useState(null);
 
   const typingTimeoutRef = useRef(null);
   const sessionTokenRef = useRef(null);
+
+  // Get channel ID for real-time typing
+  const channelId = session?.chats?.[0]?.id || session?.id;
+
+  // Use real-time typing hook
+  const { typingIndicators: realtimeTypingIndicators, isConnected: realtimeConnected } = useRealtimeTyping(channelId);
+
+  // Combine real-time and AI typing indicators
+  const typingIndicators = [...realtimeTypingIndicators, ...aiTypingIndicators];
 
   // Load widget settings on mount
   useEffect(() => {
@@ -170,23 +180,10 @@ export const useWidgetChat = (apiUrl = '/api/widget', widgetName = 'default') =>
     }
   };
 
-  // Load typing indicators
-  const loadTypingIndicators = async (sessionToken) => {
-    try {
-      const response = await fetch(`${apiUrl}/typing?sessionToken=${sessionToken}`);
-      const data = await response.json();
-
-      if (data.success) {
-        const indicators = data.typingIndicators || [];
-        setTypingIndicators(indicators);
-      } else {
-        setTypingIndicators([]);
-      }
-    } catch (error) {
-      console.error('Error loading typing indicators:', error);
-      setTypingIndicators([]);
-    }
-  };
+  // Update connection status based on real-time connection
+  useEffect(() => {
+    setIsConnected(realtimeConnected);
+  }, [realtimeConnected]);
 
   // Send message
   const sendMessage = async (content) => {
@@ -194,6 +191,32 @@ export const useWidgetChat = (apiUrl = '/api/widget', widgetName = 'default') =>
 
     setIsLoading(true);
     setError(null);
+
+    // Create optimistic user message and add it immediately
+    const userMessage = {
+      id: `temp_${Date.now()}`, // Temporary ID
+      content: content.trim(),
+      messageType: 'TEXT',
+      senderType: 'CUSTOMER',
+      isFromAI: false,
+      createdAt: new Date().toISOString(),
+      isRead: true,
+      isOptimistic: true // Flag to identify optimistic messages
+    };
+
+    // Add user message immediately (optimistic UI)
+    setMessages(prev => [...prev, userMessage]);
+
+    // Show AI typing indicator while processing
+    const aiTypingKey = `ai_typing_${Date.now()}`;
+    setAiTypingIndicators([{
+      key: aiTypingKey,
+      channelId: session?.id,
+      userId: 'ai',
+      userType: 'AI',
+      timestamp: new Date().toISOString(),
+      user: { name: 'Iris Assistant' }
+    }]);
 
     try {
       const response = await fetch(`${apiUrl}/messages`, {
@@ -211,21 +234,32 @@ export const useWidgetChat = (apiUrl = '/api/widget', widgetName = 'default') =>
       const data = await response.json();
 
       if (data.success) {
-        // Add new messages to the list
-        setMessages(prev => [...prev, ...data.messages]);
-        
+        // Remove the optimistic message and add the real messages from server
+        setMessages(prev => {
+          // Remove the optimistic message
+          const withoutOptimistic = prev.filter(msg => msg.id !== userMessage.id);
+          // Add the real messages from server
+          return [...withoutOptimistic, ...data.messages];
+        });
+
         // Update session activity
         updateSessionActivity();
-        
+
         return data.messages;
       } else {
+        // If failed, remove the optimistic message
+        setMessages(prev => prev.filter(msg => msg.id !== userMessage.id));
         throw new Error(data.error || 'Failed to send message');
       }
     } catch (error) {
       console.error('Error sending message:', error);
+      // Remove the optimistic message on error
+      setMessages(prev => prev.filter(msg => msg.id !== userMessage.id));
       setError('Failed to send message. Please try again.');
       throw error;
     } finally {
+      // Remove AI typing indicator
+      setAiTypingIndicators([]);
       setIsLoading(false);
     }
   };
@@ -246,19 +280,14 @@ export const useWidgetChat = (apiUrl = '/api/widget', widgetName = 'default') =>
         }),
       });
 
-      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
 
       // Clear typing timeout if stopping typing
       if (!isTyping && typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
         typingTimeoutRef.current = null;
-      }
-
-      // Immediately refresh typing indicators
-      if (sessionTokenRef.current) {
-        setTimeout(() => {
-          loadTypingIndicators(sessionTokenRef.current);
-        }, 100); // Small delay to ensure DB is updated
       }
     } catch (error) {
       console.error('Error setting typing indicator:', error);
@@ -311,23 +340,15 @@ export const useWidgetChat = (apiUrl = '/api/widget', widgetName = 'default') =>
     }
   };
 
-  // Periodic session activity update and typing indicators refresh
+  // Periodic session activity update
   useEffect(() => {
     if (!session || !sessionTokenRef.current) return;
 
     const interval = setInterval(() => {
       updateSessionActivity();
-      loadTypingIndicators(sessionTokenRef.current);
-    }, 5000); // Update every 5 seconds
+    }, 30000); // Update every 30 seconds (less frequent since no typing polling)
 
     return () => clearInterval(interval);
-  }, [session]);
-
-  // Load typing indicators when session starts
-  useEffect(() => {
-    if (session && sessionTokenRef.current) {
-      loadTypingIndicators(sessionTokenRef.current);
-    }
   }, [session]);
 
   // Cleanup on unmount

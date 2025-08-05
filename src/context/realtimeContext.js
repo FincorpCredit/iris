@@ -114,19 +114,27 @@ export const RealtimeProvider = ({ children }) => {
       chatId,
       (update) => {
         console.log('Typing indicator update:', update);
-        
+
         if (update.type === 'TYPING_UPDATED') {
-          const key = `${chatId}_${update.data.userId || update.data.customerId}`;
-          
-          if (update.data.isTyping) {
+          const data = update.data;
+          const key = `${data.channelId}_${data.userId}`;
+
+          if (data.isTyping) {
             setTypingIndicators(prev => new Map(prev).set(key, {
-              chatId,
-              userId: update.data.userId,
-              customerId: update.data.customerId,
-              userType: update.data.userId ? 'AGENT' : 'CUSTOMER',
-              lastTypingAt: update.data.lastTypingAt,
-              expiresAt: update.data.expiresAt
+              channelId: data.channelId,
+              userId: data.userId,
+              userType: data.userType,
+              timestamp: data.timestamp
             }));
+
+            // Auto-expire typing indicator after 5 seconds
+            setTimeout(() => {
+              setTypingIndicators(prev => {
+                const newMap = new Map(prev);
+                newMap.delete(key);
+                return newMap;
+              });
+            }, 5000);
           } else {
             setTypingIndicators(prev => {
               const newMap = new Map(prev);
@@ -135,7 +143,7 @@ export const RealtimeProvider = ({ children }) => {
             });
           }
         }
-        
+
         callback(update);
       }
     );
@@ -202,12 +210,12 @@ export const RealtimeProvider = ({ children }) => {
   }, []);
 
   // Broadcast typing indicator
-  const broadcastTyping = useCallback(async (chatId, isTyping) => {
+  const broadcastTyping = useCallback(async (channelId, isTyping) => {
     if (!isConnected || !user?.id) return;
 
     try {
       await realtimeService.broadcastTypingIndicator(
-        chatId,
+        channelId,
         isTyping,
         'AGENT',
         user.id

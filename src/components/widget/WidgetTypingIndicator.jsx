@@ -28,6 +28,7 @@ export const WidgetTypingIndicator = ({
   // Get the first typing indicator (usually there's only one)
   const indicator = indicators[0];
   const isAgent = indicator.userType === 'AGENT';
+  const isAI = indicator.userType === 'AI';
 
   return (
     <div className={cn('flex gap-2 w-full justify-start', className)} {...props}>
@@ -51,7 +52,9 @@ export const WidgetTypingIndicator = ({
       <div className="flex flex-col min-w-0 flex-1 max-w-[280px]">
         {/* Sender Name */}
         <div className="text-xs text-gray-500 mb-1 px-1 truncate">
-          {isAgent ? indicator.user?.name || 'Agent' : 'Iris Assistant'} is typing...
+          {isAgent ? indicator.user?.name || 'Agent' :
+           isAI ? indicator.user?.name || 'Iris Assistant' :
+           'Customer'} is typing...
         </div>
 
         {/* Typing Bubble */}

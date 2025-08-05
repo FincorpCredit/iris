@@ -32,10 +32,8 @@ export class RealtimeService {
     }
 
     try {
-      // Test connection
-      const { data, error } = await supabase.from('message').select('count').limit(1);
-      if (error) throw error;
-      
+      // Since we're only using real-time for broadcasting (no database queries),
+      // we can assume the connection works if we have valid credentials
       this.isConnected = true;
       console.log('Real-time service initialized successfully');
       return true;
@@ -138,34 +136,29 @@ export class RealtimeService {
   }
 
   /**
-   * Subscribe to typing indicators
+   * Subscribe to typing indicators via broadcast
    */
-  subscribeToTypingIndicators(chatId, callback) {
+  subscribeToTypingIndicators(channelId, callback) {
     if (!supabase || !this.isConnected) {
       console.warn('Real-time service not available');
       return null;
     }
 
-    const subscriptionKey = `typing_${chatId}`;
-    
+    const subscriptionKey = `typing_${channelId}`;
+
     // Unsubscribe existing subscription if any
     this.unsubscribe(subscriptionKey);
 
     const subscription = supabase
-      .channel(`typing_${chatId}`)
+      .channel(`typing_${channelId}`)
       .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'typing_indicator',
-          filter: `chatId=eq.${chatId}`
-        },
+        'broadcast',
+        { event: 'typing' },
         (payload) => {
-          console.log('Typing indicator updated:', payload);
+          console.log('Typing indicator broadcast received:', payload);
           callback({
             type: 'TYPING_UPDATED',
-            data: payload.new
+            data: payload.payload
           });
         }
       )
@@ -270,28 +263,33 @@ export class RealtimeService {
   /**
    * Broadcast typing indicator
    */
-  async broadcastTypingIndicator(chatId, isTyping, userType, userId) {
+  async broadcastTypingIndicator(channelId, isTyping, userType, userId) {
     if (!supabase || !this.isConnected) {
       console.warn('Real-time service not available');
       return;
     }
 
     try {
-      const channel = supabase.channel(`typing_${chatId}`);
-      
+      const channel = supabase.channel(`typing_${channelId}`);
+
+      const payload = {
+        channelId,
+        isTyping,
+        userType,
+        userId,
+        timestamp: new Date().toISOString()
+      };
+
       await channel.send({
         type: 'broadcast',
         event: 'typing',
-        payload: {
-          chatId,
-          isTyping,
-          userType,
-          userId,
-          timestamp: new Date().toISOString()
-        }
+        payload
       });
+
+      console.log('Typing indicator broadcasted:', payload);
     } catch (error) {
       console.error('Error broadcasting typing indicator:', error);
+      throw error;
     }
   }
 

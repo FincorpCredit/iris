@@ -29,8 +29,8 @@ export const TypingIndicator = ({
     }
 
     const chatIndicators = Array.from(typingIndicators.values())
-      .filter(indicator => indicator.chatId === chatId)
-      .sort((a, b) => new Date(b.lastTypingAt) - new Date(a.lastTypingAt));
+      .filter(indicator => indicator.channelId === chatId)
+      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
     setChatTypingUsers(chatIndicators);
   }, [typingIndicators, chatId]);
@@ -157,7 +157,7 @@ export const CompactTypingIndicator = ({
     }
 
     const count = Array.from(typingIndicators.values())
-      .filter(indicator => indicator.chatId === chatId)
+      .filter(indicator => indicator.channelId === chatId)
       .length;
 
     setTypingCount(count);
