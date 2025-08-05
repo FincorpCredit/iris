@@ -48,23 +48,28 @@ export async function POST(request) {
     // Use chatId if available, otherwise use sessionId as channel identifier
     const channelId = session.chats.length > 0 ? session.chats[0].id : session.id;
 
-    // Broadcast typing status via real-time
+    // Initialize and broadcast typing status via real-time
     try {
-      await realtimeService.broadcastTypingIndicator(
-        channelId,
-        isTyping,
-        'CUSTOMER',
-        session.customerId
-      );
+      // Initialize real-time service if not already connected
+      if (!realtimeService.isConnected) {
+        await realtimeService.initialize();
+      }
+
+      // Only broadcast if real-time service is available
+      if (realtimeService.isConnected) {
+        await realtimeService.broadcastTypingIndicator(
+          channelId,
+          isTyping,
+          'CUSTOMER',
+          session.customerId
+        );
+      } else {
+        console.warn('Real-time service not available, skipping typing broadcast');
+      }
     } catch (error) {
       console.error('Real-time typing broadcast failed:', error);
-      return NextResponse.json(
-        {
-          error: 'Failed to broadcast typing indicator',
-          details: process.env.NODE_ENV === 'development' ? error.message : undefined
-        },
-        { status: 500 }
-      );
+      // Don't return error for typing indicators - it's not critical
+      // Just log and continue
     }
 
     return NextResponse.json({

@@ -147,7 +147,7 @@ export const WidgetMessage = ({
           )}
 
           {/* AI Model Info (for development) */}
-          {isAI && message.aiModel && process.env.NODE_ENV === 'development' && (
+          {/* {isAI && message.aiModel && process.env.NODE_ENV === 'development' && (
             <div className="mt-1 text-xs opacity-60 break-words">
               <div>Model: {message.aiModel}</div>
               {message.tokenUsage && (
@@ -156,7 +156,7 @@ export const WidgetMessage = ({
                 </div>
               )}
             </div>
-          )}
+          )} */}
         </div>
 
         {/* Message Metadata */}
