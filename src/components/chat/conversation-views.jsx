@@ -46,23 +46,23 @@ export const MineConversations = ({
   )
 }
 
-// Unassigned conversations - not assigned to anyone
-export const UnassignedConversations = ({ 
-  conversations, 
-  activeConversationId, 
+// Unattended conversations - AI-handled conversations (no agent assigned)
+export const UnattendedConversations = ({
+  conversations,
+  activeConversationId,
   onConversationSelect,
-  className 
+  className
 }) => {
-  const unassignedConversations = conversations.filter(conv => 
-    !conv.assignedToMe && !conv.assignedToOther
+  const unattendedConversations = conversations.filter(conv =>
+    !conv.assignedAgentId // No agent assigned, AI is handling
   )
 
-  if (unassignedConversations.length === 0) {
+  if (unattendedConversations.length === 0) {
     return (
       <div className={cn("flex-1 flex items-center justify-center p-8", className)}>
         <div className="text-center text-muted-foreground">
-          <div className="text-lg font-medium mb-2">No unassigned conversations</div>
-          <div className="text-sm">Unassigned conversations will appear here</div>
+          <div className="text-lg font-medium mb-2">No unattended conversations</div>
+          <div className="text-sm">All conversations are assigned to agents</div>
         </div>
       </div>
     )
@@ -72,12 +72,18 @@ export const UnassignedConversations = ({
     <div className={cn("flex-1 overflow-hidden", className)}>
       <ScrollArea className="h-full">
         <div className="space-y-1 p-2">
-          {unassignedConversations.map((conversation) => (
+          {unattendedConversations.map((conversation) => (
             <ConversationItem
               key={conversation.id}
               {...conversation}
               isActive={activeConversationId === conversation.id}
               onClick={onConversationSelect}
+              showAIIndicator={true}
+              showTakeOverButton={true}
+              onTakeOver={async (chatId, conversationId) => {
+                // TODO: Implement take over functionality
+                console.log('Taking over conversation:', { chatId, conversationId })
+              }}
             />
           ))}
         </div>
@@ -114,6 +120,12 @@ export const AllConversations = ({
               {...conversation}
               isActive={activeConversationId === conversation.id}
               onClick={onConversationSelect}
+              showAIIndicator={true}
+              showTakeOverButton={!conversation.assignedAgentId}
+              onTakeOver={async (chatId, conversationId) => {
+                // TODO: Implement take over functionality
+                console.log('Taking over conversation:', { chatId, conversationId })
+              }}
             />
           ))}
         </div>
@@ -161,9 +173,9 @@ export const ConversationView = ({
           className={className}
         />
       )
-    case 'unassigned':
+    case 'unattended':
       return (
-        <UnassignedConversations
+        <UnattendedConversations
           conversations={conversations}
           activeConversationId={activeConversationId}
           onConversationSelect={onConversationSelect}

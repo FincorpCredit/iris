@@ -27,7 +27,7 @@ export async function GET(request, { params }) {
     }
 
     const agentId = decoded.userId;
-    const chatId = params.chatId;
+    const { chatId } = await params;
     const { searchParams } = new URL(request.url);
     
     const limit = parseInt(searchParams.get('limit')) || 50;
@@ -81,7 +81,7 @@ export async function POST(request, { params }) {
     }
 
     const agentId = decoded.userId;
-    const chatId = params.chatId;
+    const { chatId } = await params;
     const body = await request.json();
     const { content, messageType = 'TEXT' } = body;
 

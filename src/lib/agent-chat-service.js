@@ -414,6 +414,15 @@ export class AgentChatService {
       // Update chat statistics
       await this.updateChatStats(chatId);
 
+      // Broadcast new message via real-time
+      try {
+        if (realtimeService.isConnected) {
+          await realtimeService.broadcastNewMessage(message, chatId);
+        }
+      } catch (error) {
+        console.warn('Failed to broadcast agent message:', error.message);
+      }
+
       return message;
 
     } catch (error) {

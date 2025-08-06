@@ -19,6 +19,7 @@ if (supabaseUrl && supabaseAnonKey) {
 export class RealtimeService {
   constructor() {
     this.subscriptions = new Map();
+    this.broadcastChannels = new Map();
     this.isConnected = false;
   }
 
@@ -270,7 +271,20 @@ export class RealtimeService {
     }
 
     try {
-      const channel = supabase.channel(`typing_${channelId}`);
+      const channelName = `typing_${channelId}`;
+      let channel = this.broadcastChannels?.get(channelName);
+
+      if (!channel) {
+        // Create and subscribe to the channel for broadcasting
+        channel = supabase.channel(channelName);
+        await channel.subscribe();
+
+        // Store the channel for reuse
+        if (!this.broadcastChannels) {
+          this.broadcastChannels = new Map();
+        }
+        this.broadcastChannels.set(channelName, channel);
+      }
 
       const payload = {
         channelId,
@@ -294,6 +308,46 @@ export class RealtimeService {
   }
 
   /**
+   * Broadcast new message to all subscribers
+   */
+  async broadcastNewMessage(message, chatId) {
+    if (!supabase || !this.isConnected) {
+      console.warn('Real-time service not available for new message broadcast');
+      return false;
+    }
+
+    try {
+      const channel = supabase.channel(`messages-${chatId}`);
+
+      const result = await channel.send({
+        type: 'broadcast',
+        event: 'new_message',
+        payload: {
+          id: message.id,
+          chatId: chatId,
+          content: message.content,
+          senderType: message.senderType,
+          messageType: message.messageType,
+          isFromAI: message.isFromAI,
+          createdAt: message.createdAt,
+          user: message.user || {
+            name: message.senderType === 'CUSTOMER' ? 'Customer' :
+                  message.senderType === 'AI' ? 'AI Assistant' : 'Agent',
+            profileImage: null
+          }
+        }
+      });
+
+      console.log('New message broadcasted:', { messageId: message.id, chatId, result });
+      return true;
+
+    } catch (error) {
+      console.error('Failed to broadcast new message:', error);
+      return false;
+    }
+  }
+
+  /**
    * Broadcast message delivery status
    */
   async broadcastMessageStatus(messageId, status, chatId) {
@@ -303,14 +357,15 @@ export class RealtimeService {
     }
 
     try {
-      const channel = supabase.channel(`chat_messages_${chatId}`);
-      
+      const channel = supabase.channel(`messages-${chatId}`);
+
       await channel.send({
         type: 'broadcast',
-        event: 'message_status',
+        event: 'message_updated',
         payload: {
           messageId,
           status,
+          chatId,
           timestamp: new Date().toISOString()
         }
       });
@@ -358,6 +413,17 @@ export class RealtimeService {
    */
   disconnect() {
     this.unsubscribeAll();
+
+    // Clean up broadcast channels
+    for (const [channelName, channel] of this.broadcastChannels) {
+      try {
+        channel.unsubscribe();
+      } catch (error) {
+        console.warn('Error unsubscribing from broadcast channel:', channelName, error);
+      }
+    }
+    this.broadcastChannels.clear();
+
     this.isConnected = false;
     console.log('Real-time service disconnected');
   }

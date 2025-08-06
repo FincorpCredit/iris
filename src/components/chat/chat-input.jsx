@@ -1,16 +1,16 @@
 'use client'
 
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { 
-  Paperclip, 
-  Smile, 
-  Send, 
-  Image, 
-  FileText, 
+import {
+  Paperclip,
+  Smile,
+  Send,
+  Image,
+  FileText,
   Mic,
-  MicOff 
+  MicOff
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
@@ -18,6 +18,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
+import { useTypingIndicator } from '@/components/realtime/TypingIndicator'
 
 // Attachment button with dropdown menu
 const AttachmentButton = ({ onFileSelect, className }) => {
@@ -168,13 +169,14 @@ const SendButton = ({
 }
 
 // Text input area
-const TextInput = ({ 
-  value, 
-  onChange, 
+const TextInput = ({
+  value,
+  onChange,
   onKeyDown,
+  onTyping,
   placeholder = "Type a message...",
   disabled = false,
-  className 
+  className
 }) => {
   const handleKeyDown = (e) => {
     // Send on Enter, new line on Shift+Enter
@@ -184,10 +186,15 @@ const TextInput = ({
     }
   }
 
+  const handleChange = (e) => {
+    onChange?.(e)
+    onTyping?.()
+  }
+
   return (
     <Textarea
       value={value}
-      onChange={onChange}
+      onChange={handleChange}
       onKeyDown={handleKeyDown}
       placeholder={placeholder}
       disabled={disabled}
@@ -214,15 +221,23 @@ const ChatInput = ({
   isLoading = false,
   isRecording = false,
   showVoiceButton = true,
+  chatId,
   className
 }) => {
   const [inputValue, setInputValue] = useState(value)
+  const { startTyping } = useTypingIndicator(chatId)
 
   const handleInputChange = (e) => {
     const newValue = e.target.value
     setInputValue(newValue)
     onChange?.(newValue)
   }
+
+  const handleTyping = useCallback(() => {
+    if (chatId) {
+      startTyping()
+    }
+  }, [chatId, startTyping])
 
   const handleSend = () => {
     if (inputValue.trim() && !disabled && !isLoading) {
@@ -267,6 +282,7 @@ const ChatInput = ({
           value={inputValue}
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
+          onTyping={handleTyping}
           placeholder={placeholder}
           disabled={disabled}
           className="flex-1"

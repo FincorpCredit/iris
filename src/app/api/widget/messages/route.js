@@ -94,10 +94,9 @@ export async function POST(request) {
     // Broadcast messages via real-time if available
     try {
       if (realtimeService.isConnected) {
-        // Note: In a real implementation, you might want to broadcast to agent dashboards
-        // This is a placeholder for real-time broadcasting
-        await realtimeService.broadcastMessageStatus(customerMessage.id, 'delivered', chat.id);
-        await realtimeService.broadcastMessageStatus(aiMessage.id, 'delivered', chat.id);
+        // Broadcast new messages to agent dashboards
+        await realtimeService.broadcastNewMessage(customerMessage, chat.id);
+        await realtimeService.broadcastNewMessage(aiMessage, chat.id);
       }
     } catch (error) {
       console.warn('Real-time broadcast failed:', error.message);

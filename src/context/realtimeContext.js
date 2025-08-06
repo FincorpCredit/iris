@@ -112,7 +112,7 @@ export const RealtimeProvider = ({ children }) => {
 
     const subscriptionKey = realtimeService.subscribeToTypingIndicators(
       chatId,
-      (update) => {
+      async (update) => {
         console.log('Typing indicator update:', update);
 
         if (update.type === 'TYPING_UPDATED') {
@@ -120,12 +120,31 @@ export const RealtimeProvider = ({ children }) => {
           const key = `${data.channelId}_${data.userId}`;
 
           if (data.isTyping) {
-            setTypingIndicators(prev => new Map(prev).set(key, {
+            // Enrich typing indicator with user/customer information
+            let enrichedData = {
               channelId: data.channelId,
               userId: data.userId,
               userType: data.userType,
               timestamp: data.timestamp
-            }));
+            };
+
+            // For customer typing indicators, use customer info
+            if (data.userType === 'CUSTOMER') {
+              enrichedData.customer = {
+                id: data.userId,
+                name: 'Customer', // Will be enhanced by the component if conversation data is available
+                avatar: null
+              };
+            } else if (data.userType === 'AGENT') {
+              // For agent typing indicators, use user info if available
+              enrichedData.user = {
+                id: data.userId,
+                name: user?.name || 'Agent',
+                profileImage: user?.profileImage || null
+              };
+            }
+
+            setTypingIndicators(prev => new Map(prev).set(key, enrichedData));
 
             // Auto-expire typing indicator after 5 seconds
             setTimeout(() => {
@@ -157,7 +176,7 @@ export const RealtimeProvider = ({ children }) => {
     }
 
     return subscriptionKey;
-  }, [isConnected]);
+  }, [isConnected, user]);
 
   // Subscribe to customer online status
   const subscribeToCustomerStatus = useCallback((customerId, callback) => {

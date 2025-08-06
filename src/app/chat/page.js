@@ -13,73 +13,10 @@ import ChatInput from '@/components/chat/chat-input'
 import ResizableSidebar from '@/components/chat/resizable-sidebar'
 import MobileNavButton from '@/components/layout/mobile-nav-button'
 import { AGENT_TYPES } from '@/components/chat/agent-type'
+import { useConversations } from '@/hooks/useConversations'
+import AgentChatView from '@/components/chat/AgentChatView'
 
-// Sample conversation data
-const sampleConversations = [
-  {
-    id: '1',
-    name: 'AI Assistant',
-    avatar: null,
-    lastMessage: 'I can help you with account setup, billing questions, and technical support.',
-    timestamp: new Date(Date.now() - 5 * 60 * 1000), // 5 minutes ago
-    unreadCount: 0,
-    isOnline: true,
-    agentType: AGENT_TYPES.AI,
-    assignedToMe: true,
-    assignedToOther: false
-  },
-  {
-    id: '2',
-    name: 'Sarah Johnson',
-    avatar: null,
-    lastMessage: 'Let me check your account details and get back to you shortly.',
-    timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
-    unreadCount: 2,
-    isOnline: true,
-    agentType: AGENT_TYPES.HUMAN,
-    department: 'Technical Support',
-    assignedToMe: true,
-    assignedToOther: false
-  },
-  {
-    id: '3',
-    name: 'Mike Chen',
-    avatar: null,
-    lastMessage: 'Your billing issue has been resolved. Is there anything else I can help with?',
-    timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000), // 1 day ago
-    unreadCount: 0,
-    isOnline: false,
-    agentType: AGENT_TYPES.HUMAN,
-    department: 'Billing',
-    assignedToMe: false,
-    assignedToOther: true
-  },
-  {
-    id: '4',
-    name: 'AI Support Bot',
-    avatar: null,
-    lastMessage: 'I found 3 articles that might help with your question. Would you like me to share them?',
-    timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), // 3 days ago
-    unreadCount: 1,
-    isOnline: true,
-    agentType: AGENT_TYPES.AI,
-    assignedToMe: false,
-    assignedToOther: false
-  },
-  {
-    id: '5',
-    name: 'Customer Support',
-    avatar: null,
-    lastMessage: 'Thank you for contacting us. We will get back to you soon.',
-    timestamp: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000), // 4 days ago
-    unreadCount: 3,
-    isOnline: false,
-    agentType: AGENT_TYPES.HUMAN,
-    department: 'General Support',
-    assignedToMe: false,
-    assignedToOther: false
-  }
-]
+// Remove sample data - now using real data from database
 
 // Sample messages for different conversations
 const sampleMessages = {
@@ -155,16 +92,29 @@ const sampleMessages = {
 
 const ChatPage = () => {
   const { user } = useAuth()
-  const [activeConversationId, setActiveConversationId] = useState('1')
+  const [activeConversationId, setActiveConversationId] = useState(null)
   const [messages, setMessages] = useState(sampleMessages)
   const [isRecording, setIsRecording] = useState(false)
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
   const [isAtBottom, setIsAtBottom] = useState(true)
+  const [unreadCount, setUnreadCount] = useState(0)
   const scrollAreaRef = useRef(null)
 
+  // Fetch real conversations from database with real-time updates
+  const { conversations, isLoading, error, refresh } = useConversations({
+    useRealtime: true // Use real-time subscriptions instead of polling
+  })
+
   // Get active conversation and agent details
-  const activeConversation = sampleConversations.find(c => c.id === activeConversationId)
-  const activeMessages = messages[activeConversationId] || []
+  const activeConversation = conversations.find(c => c.id === activeConversationId)
+  const activeMessages = activeConversation ? [] : [] // TODO: Fetch real messages for selected conversation
+
+  // Set first conversation as active when conversations load
+  useEffect(() => {
+    if (!activeConversationId && conversations.length > 0) {
+      setActiveConversationId(conversations[0].id)
+    }
+  }, [conversations, activeConversationId])
   
   const agent = activeConversation ? {
     name: activeConversation.name,
@@ -220,59 +170,10 @@ const ChatPage = () => {
     }, 100)
   }
 
-  // Handle sending messages
+  // Handle sending messages - now handled by AgentChatView
   const handleSendMessage = (messageText) => {
-    if (!messageText.trim() || !activeConversationId) return
-
-    const newMessage = {
-      id: `m${Date.now()}`,
-      message: messageText,
-      timestamp: new Date(),
-      isOwn: true,
-      senderName: 'You',
-      status: 'sent'
-    }
-
-    setMessages(prev => ({
-      ...prev,
-      [activeConversationId]: [...(prev[activeConversationId] || []), newMessage]
-    }))
-
-    // Always scroll to bottom when user sends a message
-    setTimeout(() => {
-      scrollToBottom()
-      setIsAtBottom(true)
-      setUnreadCount(0)
-    }, 100)
-
-    // Simulate agent response
-    setTimeout(() => {
-      const agentResponse = {
-        id: `m${Date.now()}_response`,
-        message: activeConversation?.agentType === AGENT_TYPES.AI 
-          ? "I understand your message. Let me help you with that right away!"
-          : "Thank you for your message. I'm processing your request and will get back to you shortly.",
-        timestamp: new Date(),
-        isOwn: false,
-        senderName: activeConversation?.name,
-        agentType: activeConversation?.agentType
-      }
-
-      setMessages(prev => ({
-        ...prev,
-        [activeConversationId]: [...(prev[activeConversationId] || []), agentResponse]
-      }))
-
-      // If user is at bottom, auto-scroll to new message
-      // If not at bottom, increment unread count
-      setTimeout(() => {
-        if (isAtBottom) {
-          scrollToBottom()
-        } else {
-          setUnreadCount(prev => prev + 1)
-        }
-      }, 100)
-    }, 1500)
+    console.log('Sending message:', messageText)
+    // Message sending is now handled by the AgentChatView component
   }
 
   // Handle file attachments
@@ -330,9 +231,12 @@ const ChatPage = () => {
         {/* Desktop Resizable Sidebar */}
         <ResizableSidebar defaultWidth={320} minWidth={280} maxWidth={500}>
           <ChatSidebar
-            conversations={sampleConversations}
+            conversations={conversations}
+            isLoading={isLoading}
+            error={error}
             activeConversationId={activeConversationId}
             onConversationSelect={handleConversationSelect}
+            onRefresh={refresh}
           />
         </ResizableSidebar>
 
@@ -341,9 +245,12 @@ const ChatPage = () => {
         <SheetContent side="left" className="w-80 p-0">
           <SheetTitle className="sr-only">Conversations</SheetTitle>
           <ChatSidebar
-            conversations={sampleConversations}
+            conversations={conversations}
+            isLoading={isLoading}
+            error={error}
             activeConversationId={activeConversationId}
             onConversationSelect={handleConversationSelect}
+            onRefresh={refresh}
           />
         </SheetContent>
       </Sheet>
@@ -380,44 +287,41 @@ const ChatPage = () => {
           </div>
         </div>
 
-        {/* Messages */}
+        {/* Agent Chat View */}
         <div className="flex-1 overflow-hidden">
-          <ScrollArea ref={scrollAreaRef} className="h-full p-4">
-            <div className="space-y-4 pb-4">
-              {activeMessages.map((message, index) => (
-                <React.Fragment key={message.id}>
-                  {index > 0 && activeMessages[index - 1].isOwn !== message.isOwn && (
-                    <div className="flex justify-center mb-2">
-                      <div className="text-xs text-gray-500">{message.senderName}</div>
-                    </div>
-                  )}
-                  <MessageBubble
-                    message={message.message}
-                    timestamp={message.timestamp}
-                    isOwn={message.isOwn}
-                    senderName={message.senderName}
-                    agentType={message.agentType}
-                    status={message.status}
-                  />
-                </React.Fragment>
-              ))}
-            </div>
-          </ScrollArea>
+          <AgentChatView
+            conversation={activeConversation ? {
+              ...activeConversation,
+              chatId: activeConversation.chatId || activeConversation.id,
+              customer: {
+                name: activeConversation.name,
+                avatar: activeConversation.avatar
+              },
+              status: activeConversation.assignedAgentId ? 'ACTIVE' : 'UNATTENDED',
+              createdAt: activeConversation.timestamp
+            } : null}
+            messages={messages[activeConversationId] || []}
+            onSendMessage={handleSendMessage}
+            isLoading={isLoading}
+          />
         </div>
 
-        {/* Input */}
-        <ChatInput
-          onSend={handleSendMessage}
-          onFileSelect={handleFileSelect}
-          onStartRecording={handleStartRecording}
-          onStopRecording={handleStopRecording}
-          isRecording={isRecording}
-          placeholder={
-            activeConversation?.agentType === AGENT_TYPES.AI 
-              ? "Ask me anything..." 
-              : "Describe your issue..."
-          }
-        />
+        {/* Input - only show if conversation is selected */}
+        {activeConversation && (
+          <ChatInput
+            onSend={handleSendMessage}
+            onFileSelect={handleFileSelect}
+            onStartRecording={handleStartRecording}
+            onStopRecording={handleStopRecording}
+            isRecording={isRecording}
+            chatId={activeConversation.chatId || activeConversation.id}
+            placeholder={
+              activeConversation?.agentType === AGENT_TYPES.AI
+                ? "Ask me anything..."
+                : "Type your message..."
+            }
+          />
+        )}
       </div>
     </div>
   )

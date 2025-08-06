@@ -11,15 +11,32 @@ import { useRealtime } from '@/context/realtimeContext';
  * Typing Indicator Component
  * Shows who is currently typing in a chat with real-time updates
  */
-export const TypingIndicator = ({ 
-  chatId, 
+export const TypingIndicator = ({
+  chatId,
   className,
   showAvatars = true,
   maxVisible = 3,
-  ...props 
+  customerInfo = null,
+  ...props
 }) => {
-  const { typingIndicators } = useRealtime();
+  const { typingIndicators, subscribeToTypingIndicators, unsubscribe } = useRealtime();
   const [chatTypingUsers, setChatTypingUsers] = useState([]);
+
+  // Auto-subscribe to typing indicators for this chat
+  useEffect(() => {
+    if (!chatId) return;
+
+    const subscriptionKey = subscribeToTypingIndicators?.(chatId, (update) => {
+      // The subscription callback is handled by the context
+      // We just need to ensure the subscription exists
+    });
+
+    return () => {
+      if (subscriptionKey) {
+        unsubscribe?.(subscriptionKey);
+      }
+    };
+  }, [chatId, subscribeToTypingIndicators, unsubscribe]);
 
   // Filter typing indicators for this chat
   useEffect(() => {
@@ -30,10 +47,24 @@ export const TypingIndicator = ({
 
     const chatIndicators = Array.from(typingIndicators.values())
       .filter(indicator => indicator.channelId === chatId)
+      .map(indicator => {
+        // Enrich customer typing indicators with conversation customer info
+        if (indicator.userType === 'CUSTOMER' && customerInfo) {
+          return {
+            ...indicator,
+            customer: {
+              ...indicator.customer,
+              name: customerInfo.name || indicator.customer?.name || 'Customer',
+              avatar: customerInfo.avatar || indicator.customer?.avatar
+            }
+          };
+        }
+        return indicator;
+      })
       .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
     setChatTypingUsers(chatIndicators);
-  }, [typingIndicators, chatId]);
+  }, [typingIndicators, chatId, customerInfo]);
 
   // Don't render if no one is typing
   if (chatTypingUsers.length === 0) {
@@ -142,13 +173,29 @@ const TypingDots = ({ className }) => {
  * Compact Typing Indicator
  * Shows just a badge with typing count
  */
-export const CompactTypingIndicator = ({ 
-  chatId, 
+export const CompactTypingIndicator = ({
+  chatId,
   className,
-  ...props 
+  ...props
 }) => {
-  const { typingIndicators } = useRealtime();
+  const { typingIndicators, subscribeToTypingIndicators, unsubscribe } = useRealtime();
   const [typingCount, setTypingCount] = useState(0);
+
+  // Auto-subscribe to typing indicators for this chat
+  useEffect(() => {
+    if (!chatId) return;
+
+    const subscriptionKey = subscribeToTypingIndicators?.(chatId, (update) => {
+      // The subscription callback is handled by the context
+      // We just need to ensure the subscription exists
+    });
+
+    return () => {
+      if (subscriptionKey) {
+        unsubscribe?.(subscriptionKey);
+      }
+    };
+  }, [chatId, subscribeToTypingIndicators, unsubscribe]);
 
   useEffect(() => {
     if (!chatId) {

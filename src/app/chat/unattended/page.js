@@ -13,6 +13,8 @@ import ResizableSidebar from '@/components/chat/resizable-sidebar'
 import MobileNavButton from '@/components/layout/mobile-nav-button'
 import { AGENT_TYPES } from '@/components/chat/agent-type'
 import { Badge } from '@/components/ui/badge'
+import AgentChatView from '@/components/chat/AgentChatView'
+import { useConversations } from '@/hooks/useConversations'
 
 // Sample unattended conversations
 const unattendedConversations = [
@@ -64,10 +66,37 @@ const UnattendedPage = () => {
   const [activeConversationId, setActiveConversationId] = useState('1')
   const [isRecording, setIsRecording] = useState(false)
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
+  const [messages, setMessages] = useState({})
   const scrollAreaRef = useRef(null)
 
   // Get active conversation and agent details
   const activeConversation = unattendedConversations.find(c => c.id === activeConversationId)
+
+  // Sample messages for the active conversation
+  const conversationMessages = messages[activeConversationId] || [
+    {
+      id: 'm1',
+      content: 'I need help with my account setup. Can someone assist me?',
+      senderType: 'CUSTOMER',
+      createdAt: new Date(Date.now() - 45 * 60 * 1000),
+      user: { name: 'Customer' }
+    },
+    {
+      id: 'm2',
+      content: 'I\'ve been waiting for 45 minutes now. Is anyone available?',
+      senderType: 'CUSTOMER',
+      createdAt: new Date(Date.now() - 30 * 60 * 1000),
+      user: { name: 'Customer' }
+    },
+    {
+      id: 'm3',
+      content: 'Hello! I can help you with your account setup. Let me take a look at your account.',
+      senderType: 'AGENT',
+      isFromAI: false,
+      createdAt: new Date(Date.now() - 25 * 60 * 1000),
+      user: { name: 'Agent Smith', profileImage: null }
+    }
+  ]
   
   const agent = activeConversation ? {
     name: activeConversation.name,
@@ -89,10 +118,10 @@ const UnattendedPage = () => {
     // Here you would update the conversation to be assigned to the current user
   }
 
-  // Handle sending messages
+  // Handle sending messages - now handled by AgentChatView
   const handleSendMessage = (messageText) => {
-    if (!messageText.trim() || !activeConversationId) return
     console.log('Sending message:', messageText)
+    // Message sending is now handled by the AgentChatView component
   }
 
   // Handle file attachments
@@ -248,42 +277,25 @@ const UnattendedPage = () => {
           </div>
         </div>
 
-        {/* Messages or empty state */}
+        {/* Agent Chat View */}
         <div className="flex-1 overflow-hidden">
-          {activeConversation ? (
-            <div className="flex items-center justify-center h-full p-8">
-              <div className="text-center text-muted-foreground max-w-md">
-                <AlertCircle className="w-12 h-12 mx-auto mb-4 text-orange-500" />
-                <h3 className="text-lg font-medium mb-2">Unattended Conversation</h3>
-                <p className="text-sm mb-4">
-                  This conversation has been waiting for {activeConversation.waitTime}. 
-                  Take ownership to start helping the customer.
-                </p>
-                <div className="flex items-center justify-center gap-2 text-xs">
-                  <div className={`w-2 h-2 rounded-full ${getPriorityColor(activeConversation.priority)}`} />
-                  <span className="capitalize">{activeConversation.priority} priority</span>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="flex items-center justify-center h-full p-8">
-              <div className="text-center text-muted-foreground">
-                <AlertCircle className="w-12 h-12 mx-auto mb-4" />
-                <h3 className="text-lg font-medium mb-2">No Conversation Selected</h3>
-                <p className="text-sm">Select an unattended conversation to view details</p>
-              </div>
-            </div>
-          )}
+          <AgentChatView
+            conversation={activeConversation ? {
+              ...activeConversation,
+              chatId: activeConversation.chatId || activeConversation.id,
+              customer: {
+                name: activeConversation.name,
+                avatar: activeConversation.avatar
+              },
+              status: 'UNATTENDED',
+              createdAt: activeConversation.timestamp
+            } : null}
+            messages={conversationMessages}
+            onSendMessage={handleSendMessage}
+            onTakeConversation={handleTakeConversation}
+            isLoading={false}
+          />
         </div>
-
-        {/* Input - only show if conversation is taken */}
-        {activeConversation && (
-          <div className="border-t border-border bg-muted/20 p-4">
-            <div className="text-center text-sm text-muted-foreground">
-              Take ownership of this conversation to start messaging
-            </div>
-          </div>
-        )}
       </div>
     </div>
   )
